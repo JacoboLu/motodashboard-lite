@@ -20,16 +20,34 @@ jobs:
         run: |
           set -euo pipefail
           python3 - <<'PY'
-          import base64, pathlib
-          encoded = pathlib.Path("MotoDashboard_Lite_Source.zip.b64").read_text()
-          archive = base64.b64decode("".join(encoded.split()), validate=True)
-          pathlib.Path("/tmp/motodashboard-source.zip").write_bytes(archive)
+          import base64, io, pathlib, zipfile
+          encoded = "".join(pathlib.Path("MotoDashboard_Lite_Source.zip.b64").read_text().split())
+          archive = None
+          try:
+              archive = base64.b64decode(encoded, validate=True)
+          except Exception:
+              # Repair a single stray character in the uploaded text archive, if present.
+              for index in range(len(encoded)):
+                  candidate_text = encoded[:index] + encoded[index + 1:]
+                  try:
+                      candidate = base64.b64decode(candidate_text, validate=True)
+                      with zipfile.ZipFile(io.BytesIO(candidate)) as zf:
+                          if zf.testzip() is None:
+                              archive = candidate
+                              break
+                  except Exception:
+                      continue
+          if archive is None:
+              raise SystemExit("Source archive is corrupted; no valid ZIP could be recovered.")
+          with zipfile.ZipFile(io.BytesIO(archive)) as zf:
+              bad_member = zf.testzip()
+              if bad_member:
+                  raise SystemExit(f"ZIP integrity check failed: {bad_member}")
+              zf.extractall(".")
+          for required in ("settings.gradle.kts", "app/build.gradle.kts", "app/src/main/AndroidManifest.xml"):
+              if not pathlib.Path(required).is_file():
+                  raise SystemExit(f"Missing Android project file: {required}")
           PY
-          unzip -t /tmp/motodashboard-source.zip
-          unzip -o /tmp/motodashboard-source.zip -d .
-          test -f settings.gradle.kts
-          test -f app/build.gradle.kts
-          test -f app/src/main/AndroidManifest.xml
           rm MotoDashboard_Lite_Source.zip.b64
 
       - name: Set up Java 17
