@@ -12,23 +12,50 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - name: Restore Android project
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Restore Android project archive
+        shell: bash
         run: |
-          base64 -d MotoDashboard_Lite_Source.zip.b64 > /tmp/source.zip
-          unzip -o /tmp/source.zip -d .
+          set -euo pipefail
+          python3 - <<'PY'
+          import base64, pathlib
+          encoded = pathlib.Path("MotoDashboard_Lite_Source.zip.b64").read_text()
+          archive = base64.b64decode("".join(encoded.split()), validate=True)
+          pathlib.Path("/tmp/motodashboard-source.zip").write_bytes(archive)
+          PY
+          unzip -t /tmp/motodashboard-source.zip
+          unzip -o /tmp/motodashboard-source.zip -d .
+          test -f settings.gradle.kts
+          test -f app/build.gradle.kts
+          test -f app/src/main/AndroidManifest.xml
           rm MotoDashboard_Lite_Source.zip.b64
-      - uses: actions/setup-java@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
-      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Set up Gradle 8.9
+        uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK packages
+        run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+
       - name: Build debug APK
-        run: gradle assembleDebug
-      - uses: actions/upload-artifact@v4
+        run: gradle --no-daemon assembleDebug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
         with:
           name: MotoDashboard-Lite-debug-apk
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
+          retention-days: 14
