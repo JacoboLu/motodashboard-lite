@@ -80,7 +80,6 @@ jobs:
           import android.view.KeyEvent
           import android.view.WindowManager
           import android.webkit.*
-          import androidx.core.app.ActivityCompat
           import android.hardware.*
           import java.util.Locale
 
@@ -105,8 +104,8 @@ jobs:
               gps()
             }
             private fun gps(){
-              if(ActivityCompat.checkSelfPermission(this,Manifest.permission.ACCESS_FINE_LOCATION)!=PackageManager.PERMISSION_GRANTED){
-                ActivityCompat.requestPermissions(this,arrayOf(Manifest.permission.ACCESS_FINE_LOCATION,Manifest.permission.ACCESS_COARSE_LOCATION),8); return
+              if(checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)!=PackageManager.PERMISSION_GRANTED){
+                requestPermissions(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION,Manifest.permission.ACCESS_COARSE_LOCATION),8); return
               }
               try{if(lm.isProviderEnabled(LocationManager.GPS_PROVIDER)) lm.requestLocationUpdates(LocationManager.GPS_PROVIDER,1000,1f,this)
                 lm.getLastKnownLocation(LocationManager.GPS_PROVIDER)?.let{onLocationChanged(it)}
