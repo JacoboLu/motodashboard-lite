@@ -64,8 +64,6 @@ jobs:
           for pkg in ['com.spotify.music','com.google.android.apps.youtube.music']:
               ET.SubElement(q,'package',{a+'name':pkg})
           app=r.find('application')
-          svc=ET.SubElement(app,'service',{a+'name':'.MediaNotificationListener',a+'label':'MotoDashboard multimedia',a+'permission':'android.permission.BIND_NOTIFICATION_LISTENER_SERVICE',a+'exported':'true'})
-          it=ET.SubElement(svc,'intent-filter'); ET.SubElement(it,'action',{a+'name':'android.service.notification.NotificationListenerService'})
           for x in app.findall('activity'):
               if x.get(a+'name','').endswith('MainActivity'):
                   x.set(a+'screenOrientation','landscape')
@@ -88,8 +86,6 @@ jobs:
           import android.webkit.*
           import android.hardware.*
           import java.util.Locale
-          import android.service.notification.*
-          import android.app.Notification
 
           class MainActivity: Activity(), LocationListener, SensorEventListener {
             private lateinit var w:WebView
@@ -97,7 +93,6 @@ jobs:
             private lateinit var sm:SensorManager
             private var last:Location?=null
             private val audio by lazy { getSystemService(AUDIO_SERVICE) as AudioManager }
-            private val mediaReceiver=object:BroadcastReceiver(){override fun onReceive(c:Context?,i:Intent?){if(i?.action=="com.motodashboard.MEDIA_INFO"){val t=i.getStringExtra("title")?:"Sin reproducción";val a=i.getStringExtra("artist")?:"";val p=i.getStringExtra("app")?:"Multimedia";w.evaluateJavascript("mediaInfo("+org.json.JSONObject.quote(t)+","+org.json.JSONObject.quote(a)+","+org.json.JSONObject.quote(p)+")",null)}}}
             override fun onCreate(b:Bundle?){
               super.onCreate(b); requestedOrientation=android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
               window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
@@ -107,7 +102,7 @@ jobs:
               w=WebView(this); w.settings.javaScriptEnabled=true; w.settings.domStorageEnabled=true
               w.settings.mediaPlaybackRequiresUserGesture=true; w.webChromeClient=WebChromeClient()
               w.webViewClient=WebViewClient(); w.addJavascriptInterface(Bridge(),"Moto")
-              setContentView(w); registerReceiver(mediaReceiver,IntentFilter("com.motodashboard.MEDIA_INFO"),Context.RECEIVER_NOT_EXPORTED); w.loadDataWithBaseURL("https://motodashboard.local/",PAGE,"text/html","UTF-8",null)
+              setContentView(w); w.loadDataWithBaseURL("https://motodashboard.local/",PAGE,"text/html","UTF-8",null)
               val s=sm.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR) ?: sm.getDefaultSensor(Sensor.TYPE_ORIENTATION)
               s?.let{sm.registerListener(this,it,SensorManager.SENSOR_DELAY_UI)}
               gps()
@@ -140,14 +135,13 @@ jobs:
               }
               @JavascriptInterface fun volume(d:Int){audio.adjustStreamVolume(AudioManager.STREAM_MUSIC,if(d>0)AudioManager.ADJUST_RAISE else AudioManager.ADJUST_LOWER,0)}
               @JavascriptInterface fun settings(){startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))}
-              @JavascriptInterface fun mediaSettings(){startActivity(Intent("android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS"))}
               @JavascriptInterface fun streaming(app:String){
                 val pkg=when(app){"spotify"->"com.spotify.music";"ytmusic"->"com.google.android.apps.youtube.music";else->return}
                 try { val launch=Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER).setPackage(pkg).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK); startActivity(launch) }
                 catch(_:Exception){ try{startActivity(Intent(Intent.ACTION_VIEW,android.net.Uri.parse("market://details?id="+pkg)))}catch(_:Exception){startActivity(Intent(Intent.ACTION_VIEW,android.net.Uri.parse("https://play.google.com/store/apps/details?id="+pkg)))} }
               }
             }
-            override fun onDestroy(){try{unregisterReceiver(mediaReceiver);lm.removeUpdates(this);sm.unregisterListener(this)}catch(_:Exception){};w.destroy();super.onDestroy()}
+            override fun onDestroy(){try{lm.removeUpdates(this);sm.unregisterListener(this)}catch(_:Exception){};w.destroy();super.onDestroy()}
             companion object{
               private const val PAGE="""<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"><script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><style>
               *{box-sizing:border-box}html,body,#map{margin:0;width:100%;height:100%;overflow:hidden;background:#0b1218;color:#eef5f8;font-family:Arial}#map{position:absolute;inset:0}.leaflet-control-attribution{font-size:9px!important}.leaflet-control-zoom a{background:#101c25!important;color:white!important}
@@ -159,7 +153,7 @@ jobs:
               <div class="tools"><button onclick="center()">◎</button><button onclick="map.zoomIn()">＋</button><button onclick="map.zoomOut()">－</button><button onclick="follow=!follow">⌖</button></div>
               <div class="speed"><small>VELOCIDAD GPS</small><b id="speed">--</b><span>km/h</span></div>
               <div class="stats"><div class="chip" id="gps">GPS buscando</div><div class="chip">ALT <b id="alt">--</b></div><div class="chip">RUMBO <b id="head">--°</b></div><div class="chip">PREC <b id="acc">--</b></div></div>
-              <div class="player"><div class="track"><div class="art" id="art">♫</div><div style="min-width:0"><div class="song" id="song">Sin reproducción activa</div><div class="sub" id="artist">Conecta Spotify o YouTube Music</div><div class="sub" id="appname">Multimedia Android</div></div></div><div class="controls"><button onclick="Moto.mediaSettings()">Permitir datos</button><button onclick="Moto.media('prev')">|◀</button><button class="play" onclick="Moto.media('toggle')">▶ / Ⅱ</button><button onclick="Moto.media('next')">▶|</button><button onclick="Moto.volume(-1)">－</button><button onclick="Moto.volume(1)">＋</button></div></div>
+              <div class="player"><div class="track"><div class="art" id="art">♫</div><div style="min-width:0"><div class="song" id="song">Sin reproducción activa</div><div class="sub" id="artist">Conecta Spotify o YouTube Music</div><div class="sub" id="appname">Multimedia Android</div></div></div><div class="controls"><button onclick="Moto.media('prev')">|◀</button><button class="play" onclick="Moto.media('toggle')">▶ / Ⅱ</button><button onclick="Moto.media('next')">▶|</button><button onclick="Moto.volume(-1)">－</button><button onclick="Moto.volume(1)">＋</button></div></div>
               <script>const map=L.map('map',{zoomControl:false}).setView([-12.0464,-77.0428],13);L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',referrerPolicy:'strict-origin-when-cross-origin'}).addTo(map);let pin=null,follow=true,lat=null,lon=null;
               function gps(a,b,s,h,c){lat=a;lon=b;document.getElementById('speed').textContent=Math.round(s);document.getElementById('alt').textContent=Math.round(h)+' m';document.getElementById('acc').textContent=Math.round(c)+' m';document.getElementById('gps').textContent='● GPS conectado';document.getElementById('gps').className='chip green';if(!pin)pin=L.circleMarker([a,b],{radius:8,color:'#fff',weight:3,fillColor:'#168fff',fillOpacity:1}).addTo(map);else pin.setLatLng([a,b]);if(follow)map.setView([a,b],Math.max(15,map.getZoom()))}
               function gpsOff(){document.getElementById('gps').textContent='GPS no disponible'}function compass(d){document.getElementById('head').textContent=d+'°'}function center(){if(lat!==null){follow=true;map.setView([lat,lon],16)}else Moto.settings()}map.on('dragstart',()=>follow=false);
@@ -183,15 +177,6 @@ jobs:
               function instruction(m,n){let t=({turn:'Gira','new name':'Continúa',depart:'Inicia la ruta',arrive:'Has llegado',merge:'Incorpórate',roundabout:'En la rotonda',fork:'En la bifurcación','on ramp':'Toma la incorporación','off ramp':'Sal de la vía','end of road':'Al final de la vía'});let s=t[m.type]||'Continúa';if(m.modifier)s+=' '+m.modifier.replace('_',' ');return s+(n?' hacia '+n:'')}
               function showNext(){if(routeSteps.length){let s=routeSteps[Math.min(stepIndex,routeSteps.length-1)];document.getElementById('maneuver').innerHTML='<div style="font-size:17px;font-weight:bold;padding:10px 0">SIGUIENTE: '+instruction(s.maneuver,s.name)+'</div>';}}
               function gps(a,b,s,h,c){lat=a;lon=b;document.getElementById('speed').textContent=Math.round(s);document.getElementById('alt').textContent=Math.round(h)+' m';document.getElementById('acc').textContent=Math.round(c)+' m';document.getElementById('gps').textContent='● GPS conectado';document.getElementById('gps').className='chip green';if(!pin)pin=L.circleMarker([a,b],{radius:8,color:'#fff',weight:3,fillColor:'#168fff',fillOpacity:1}).addTo(map);else pin.setLatLng([a,b]);if(follow)map.setView([a,b],Math.max(15,map.getZoom()))}document.getElementById('q').onkeydown=e=>{if(e.key==='Enter')search()};function tick(){document.getElementById('clock').textContent=new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}tick();setInterval(tick,1000);</script></body></html>"""
-            }
-          }
-          class MediaNotificationListener: NotificationListenerService(){
-            override fun onNotificationPosted(sbn:StatusBarNotification){
-              val e=sbn.notification.extras
-              val title=e.getCharSequence(Notification.EXTRA_TITLE)?.toString() ?: return
-              val artist=e.getCharSequence(Notification.EXTRA_TEXT)?.toString() ?: e.getCharSequence(Notification.EXTRA_SUB_TEXT)?.toString() ?: ""
-              val label=try{packageManager.getApplicationLabel(packageManager.getApplicationInfo(sbn.packageName,0)).toString()}catch(_:Exception){sbn.packageName}
-              sendBroadcast(Intent("com.motodashboard.MEDIA_INFO").setPackage(packageName).putExtra("title",title).putExtra("artist",artist).putExtra("app",label))
             }
           }
           KOTLIN
